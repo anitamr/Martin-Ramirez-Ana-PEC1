@@ -1,0 +1,30 @@
+---
+title: "Metadatos comentados"
+author: "Ana Martín Ramírez"
+date: "2025-03-22"
+output: html_document
+---
+En primer lugar, cargamos y visualizamos el fichero DataInfo_S013.csv en R. Una vez hecho esto, analizamos la estructura e información de dicho fichero. 
+
+El fichero DataInfo_S013.csv contiene los metadatos correspondientes al estudio metabolómico seleccionado que lleva por título "Metabotipos de respuesta a la cirugía bariátrica independientes de la magnitud de la pérdida de peso". *(Palau-Rodriguez M, Tulipani S, Marco-Ramell A, Miñarro A, Jáuregui O, Sanchez-Pla A, Ramos-Molina B, Tinahones FJ, Andres-Lacueva C. Metabotypes of response to bariatric surgery independent of the magnitude of weight loss. PLoS One. 2018 Jun 1;13(6):e0198214. doi: 10.1371/journal.pone.0198214. PMID: 29856816; PMCID: PMC5983508).*
+
+```{r}
+# Verificamos que los metadatos están en el directorio de trabajo actual
+getwd()
+
+# Cargamos el archivo con los metadatos desde el directorio de trabajo y lo visualizamos 
+data <- read.csv("./DataInfo_S013.csv")
+data
+# Hacemos un resumen de los metadatos 
+summary(data)
+```
+
+Al analizar el fichero de metadatos, vimos que parece describir un conjunto de variables recolectadas para los sujetos de un estudio metabólico. Cada una de las 695 filas del archivo corresponde a una variable que contiene información sobre las características o niveles de ciertos metabolitos de los sujetos en un momento específico (como edad, género, nivel de hierro, nivel de Lysina, nivel de creatinina...)
+
+
+Además, se vio que el fichero constaba de 4 columnas y 695 filas. Las columnas son:  
+- X: número de identificación o índice. Contiene 695 registros y los datos son de tipo carácter
+- VarName: nombre de la variable o columna que describe algún atributo o medida relacionada con los sujetos del estudio. Contiene 695 registros y los datos son de tipo carácter
+- varTpe: tipo de datos de la variable (puede ser integer, character o numeric). Contiene 695 registros y los datos que contiene son de tipo carácter
+- Description: descripción de los datos. Contiene 695 registros y los datos son de tipo carácter
+
