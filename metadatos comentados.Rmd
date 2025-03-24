@@ -1,0 +1,40 @@
+---
+title: "Datos en formato texto y metadatos comentados"
+author: "Ana Martín Ramírez"
+date: "2025-03-22"
+output: html_document
+---
+En primer lugar, instalamos el paquete "BiocManager" en la consola de R para poder acceder a Bioconductor. Una vez hecho esto, seleccionamos el dataset que lleva por título "Metabotyping2018" contenido en el repositorio "nutrimetabolomics" de Github. El dataset está compuesto de 3 archivos: 
+- DataInfo_S013.csv: corresponde a los metadatos, es decir, contiene la información de cada columna del archivo "DataValues_S013.csv".
+- DataValues_S013.csv: contiene los valores clínicos y metabólicos de 39 pacientes en 5 puntos de tiempo diferentes. 
+- AAInformation_S006.csv: contiene información adicional sobre los metabolitos del archivo "DataValues_S013.csv".
+
+En este caso, se seleccionó el dataset "DataValues_S013.csv" que contiene los datos correspondientes a un  estudio metabolómico en el que se analizaron los niveles de diferentes metabolitos (urea, hierro, transferrina...) en pacientes sometidos a cirugía bariátrica y que lleva por título "Metabotipos de respuesta a la cirugía bariátrica independientes de la magnitud de la pérdida de peso". *(Palau-Rodriguez M, Tulipani S, Marco-Ramell A, Miñarro A, Jáuregui O, Sanchez-Pla A, Ramos-Molina B, Tinahones FJ, Andres-Lacueva C. Metabotypes of response to bariatric surgery independent of the magnitude of weight loss. PLoS One. 2018 Jun 1;13(6):e0198214. doi: 10.1371/journal.pone.0198214. PMID: 29856816; PMCID: PMC5983508).*
+```{r}
+# Cargamos el archivo desde el directorio de trabajo y lo visualizamos 
+datos <- read.csv("DataValues_S013.csv")
+# Visualizamos las primeras filas, las dimensiones y los nombres de las columnas
+head(datos)
+colnames(datos)
+dim(datos)
+
+```
+
+Tras cargar el dataset "DataValues_S013.csv" en R, se vio que contenía los niveles de distintos metabolitos (urea, creatinina, serotonina, transferrina...) medidos en una muestra compuesta por 39 pacientes sometidos a cirugía bariátrica. Además, al analizar las dimensiones del fichero, se vio que contenía un total de 39 filas/registros y 696 variables/columnas. Una hechos estos análisis, cargamos el fichero "Data_Info2013.csv" en R que contiene los metadatos del estudio metabolómico objeto de estudio. 
+
+```{r}
+
+# Cargamos el archivo con los metadatos desde el directorio de trabajo 
+metadatos <- read.csv("./DataInfo_S013.csv")
+# Visualizamos las primeras filas, las dimensiones y los nombres de las columnas
+head(metadatos)
+colnames(metadatos)
+dim(metadatos)
+```
+
+Al analizar el fichero de metadatos, vimos que parece describir un conjunto de variables recolectadas para los sujetos de un estudio metabólico. Cada una de las 695 filas del archivo corresponde a una variable que contiene información sobre las características o niveles de ciertos metabolitos de los sujetos en un momento específico (como edad, género, nivel de hierro, nivel de Lysina, nivel de creatinina...). Además, al analizar las dimensiones del fichero, se vio que contenía un total de 695 filas y 4 columnas. 
+Las columnas del fichero son:  
+- X: número de identificación o índice. 
+- VarName: nombre de la variable o columna que describe algún atributo o medida relacionada con los sujetos del estudio. 
+- varTpe: tipo de datos de la variable (puede ser integer, character o numeric).
+- Description: descripción de los datos.
