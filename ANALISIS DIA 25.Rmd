@@ -1,0 +1,414 @@
+---
+title: "Análisis exploratorio de datos"
+author: "Ana Martín Ramírez"
+date: "2025-03-25"
+output: html_document
+---
+
+1. Carga de datos crudos: una vez seleccionado el conjunto de datos del estudio metabolómico desde GitHub, se cargaron los archivos de datos y metadatos en R, y se verificaron las dimensiones y el contenido de cada archivo.
+```{r}
+
+# Cargamos los datos de las mediciones (metabolitos)
+DataValues_S013 <- read.csv("DataValues_S013.csv", header = TRUE)
+# Visualizamos las dimensiones y columnas
+head(DataValues_S013)
+dim(DataValues_S013)  
+head(colnames(DataValues_S013))
+
+# Cargamos los metadatos
+DataInfo_S013 <- read.csv("DataInfo_S013.csv", header = TRUE)
+# Visualizamos las primeras filas, dimensiones y columnas
+head(DataInfo_S013)
+dim(DataInfo_S013)
+head(colnames(DataInfo_S013))
+
+```
+Tras cargar el conjunto de datos "DataValues_S013.csv" en R, se observó que contenía los datos crudos correspondientes al estudio metabolómico que se está analizando. Este archivo tiene un total de 39 filas y 696 columnas. Cada fila representa un paciente del estudio metabolómico, mientras que las columnas incluyen diversas características o mediciones de los sujetos, tales como edad, género, tipo de cirugía a la que fueron sometidos, y niveles de varios metabolitos analizados, como hierro, transferrina, colesterol HDL, colesterol LDL, glucosa, entre otros.
+
+Adicionalmente, al cargar el archivo "DataInfo_S013.csv", se verificó que contenía los metadatos del estudio. Este archivo tiene un total de 695 filas y 4 columnas. Cada fila representa una variable relacionada con las características o los niveles de los metabolitos de los sujetos en un momento determinado (por ejemplo, edad, género o niveles de algún metabolito). Las columnas de este archivo son las siguientes:
+ 
+- X: número de identificación o índice. 
+- VarName: nombre de la variable o columna que describe algún atributo o medida relacionada con los sujetos del estudio. 
+- varTpe: tipo de datos de la variable (puede ser integer, character o numeric).
+- Description: explica la naturaleza de los datos correspondientes a esa variable
+
+2. Procesamiento y alineación de datos y metadatos: dado que el dataset "DataValues_S013" tiene 39 filas (muestras) y el dataset "DataInfo_S013" tiene 695 filas (metadatos de las variables), fue necesario ajustar ambos archivos para garantizar que estuvieran correctamente alineados. Las filas de los datos de "DataValues_S013" debían coincidir con las de "DataInfo_S013", por lo que se recortó "DataInfo_S013" para que tuviese 39 filas. Además, se eliminó la primera columna de ambos dataset, puesto que en ambos casos la información era redundante y los valores faltantes Na. 
+```{r}
+# Eliminamos la primera columna redundante de ambos datasets
+DataValues_S013 <- DataValues_S013[, -1]
+DataInfo_S013 <- DataInfo_S013[, -1]
+
+# Recortamos DataInfo_S013 a 39 filas
+DataInfo_S013 <- DataInfo_S013[1:39, ]
+
+# Verificamos las dimensiones
+dim(DataInfo_S013)  # Debe ser (39, 3)
+dim(DataValues_S013)  # Debe ser (39, 695)
+
+
+# Contamos los valores perdidos
+sum(is.na(DataValues_S013))
+
+# Limpiamos los datos eliminando las filas con NA
+DataValues_S013_clean <- na.omit(DataValues_S013)
+
+```
+
+
+
+3. Creación del objeto SummarizedExperiment
+A continuación, creamos un objeto SummarizedExperiment a partir de los datos y metadatos. Un objeto SummarizedExperiment es una estructura de datos utilizada principalmente en bioinformática y análisis de datos ómicos, como los estudios de transcriptómica, metabolómica, genómica, entre otros. Este tipo de objeto es utilizado para almacenar y manejar datos de múltiples muestras de manera eficiente y flexible, y es parte del paquete SummarizedExperiment en Bioconductor. 
+
+Este objeto  consta de 3 componentes principales:  
+- Assays: es un contendedor de matrices de datos numéricos, donde se almacenan las mediciones cuantitativas de los experimentos. 
+
+- Row Data (datos de filas): son los metadatos asociados con las filas de los datos en el objeto summarizedexperiment. Los datos de las filas se almancenan generalmente en un Dataframe.
+
+- Col Data (datos de columnas): son los metadatos asociados con las columnas del objeto summarizedexperiment, es decir, las muestras.Estos metadatos podrían incluir información sobre las muestras, como el tratamiento, la edad del paciente, o cualquier otra característica relevante de las muestras. Al igual que los datos de las filas, estos metadatos se almacenan en un DataFrame.
+
+ El objeto summarizedExperiment presenta varias diferencias con respecto al objeto expressionset: 
+- ExpresssionSet: se utiliza principalmente para almacenar datos de expresión genética (como microarrays o RNA-Seq). Su estructura incluye una matriz de expresión (o "matriz de datos") junto con un conjunto de metadatos relacionados con las muestras (filas) y las características (columnas).Los metadatos de las filas (muestras) y columnas (genes o características) se almacenan en objetos separados, como pData (para muestras) y fData (para características). Originalmente fue diseñado para el análisis de expresión génica, lo que lo hace menos adecuado para datos que no sean de expresión génica.
+
+- SummarizedExperiment: es una extensión más generalizada que puede usarse para una variedad de tipos de datos, no solo expresión genética. Además de almacenar la matriz de datos, también almacena información asociada con las filas y las columnas en formato de DataFrame, proporcionando una forma más flexible de manejar datos de múltiples tipos (por ejemplo, metabolómica, genómica, proteómica, etc.). Almacena los metadatos de las filas y columnas dentro de un solo objeto de tipo DataFrame (para las filas y las columnas), lo que proporciona una mayor flexibilidad en el manejo de los datos. a sido diseñado para manejar cualquier tipo de datos experimentales en forma de tablas, incluidos datos de metabolómica, proteómica, y genómica, y ofrece una mayor flexibilidad.
+
+Una vez ajustadas las dimensiones de los ficheros, creamos un dataframe para rowData con la información sobre las muestras(filas) y otro para colData con la información sobre las variables (columnas). Una vez hecho esto, instalamos el paquete SummarizedExperiment y creamos el objeto SummarizedExperiment con sus 3 elementos: assays, rowData y colData.
+```{r}
+# Instalamos y cargamos paquetes necesarios
+BiocManager::install("S4Vectors")
+BiocManager::install("SummarizedExperiment")
+library(SummarizedExperiment)
+library(S4Vectors)
+
+# Creamos un DataFrame para rowData (información sobre las muestras)
+rowData <- DataFrame(DataInfo_S013)
+
+# Creamos un DataFrame para colData (información sobre las variables/metabolitos)
+colData <- DataFrame(VarName = colnames(DataValues_S013))
+
+
+# Creamos el objeto SummarizedExperiment
+se <- SummarizedExperiment(
+  assays = list(counts = as.matrix(DataValues_S013)),  # Datos de las mediciones
+  rowData = rowData,  # Información sobre las muestras
+  colData = colData   # Información sobre las variables
+)
+
+# Visualizamos el objeto creado
+se
+```
+
+Una vez creado el objeto SummarizedExperiment, comprobamos que tenía la información correcta revisando sus componentes principales y verificando las dimensiones del objeto. Por último, guardamos el objeto en un archivo.Rda para poder subirlo posteriormente al repositorio de Github creado anteriormente.
+```{r}
+# Visualizamos los primeros metadatos de las filas (rowData)
+head(rowData(se))
+
+# Visualizamos los primeros metadatos de las columnas (colData)
+head(colData(se))
+
+# Visualizamos las dimensiones del objeto SummarizedExperiment
+dim(se)
+
+# Verificamos que el objeto que hemos creado se encuentra el directorio de trabajo actual
+getwd()
+
+# Guardamos el objeto SummarizedExperiment en formato binario .Rda para luego subirlo a github
+save(se, file = "summarized_experiment.Rda")
+cat("El objeto SummarizedExperiment se ha guardado en 'summarized_experiment.Rda'.")
+
+# Cargamos el archivo que hemos generado para asegurarnos de que todo está bien guardado
+load("summarized_experiment.Rda")
+```
+
+Una vez creado el objeto SummarizedExperiment lo analizamos detenidamente y vimos que:
+
+- Tiene un total de 39 filas y 695 columnas, lo que indica que contiene 39 muestras(pacientes) y 695 variables (metabolitos u otros atributos medidos), lo que coincide con la descripción del conjunto de datos
+
+- Contiene 1 conjunto de datos en el componente assays, llamado counts. Esto sugiere que los datos experimentales, como los niveles de los metabolitos o las mediciones, están almacenados en este conjunto de datos bajo el nombre counts.
+
+- Contiene el dataframe Rowdata y el dataframe colData. El dataframe Rowdata tiene 3 columnas que proporcionan información sobre las muestras como el nombre de la variable o atributo que se está estudiando (VarName), el tipo de variable (varTpe) y la descripción de la variable (dataDesc). El dataframe colData tiene una sola columna llamada VarName que almacena los nombres de las columnas de DataValues_S013, es decir, las variables o metabolitos evaluados.
+
+- No contiene metadatos adicionales almacenados en el objeto creado, lo que podría significar que no se han añadido metadatos adicionales fuera de los rowData y colData
+
+
+
+4.  Análisis exploratorio del conjunto de datos 
+
+En primer lugar, se identificaron el tipo de variables (numéricas y categóricas) que componían el dataset "DataValues_S013"
+```{r}
+
+# Obtener el tipo de cada columna en el dataset
+column_types <- sapply(DataValues_S013_clean, class)
+
+# Identificar las variables numéricas
+numeric_vars <- names(column_types[column_types == "numeric" | column_types == "integer"])
+
+# Identificar las variables categóricas (factores o caracteres)
+categorical_vars <- names(column_types[column_types == "factor" | column_types == "character"])
+
+# Mostrar las variables numéricas y categóricas
+cat("Variables numéricas:\n")
+cat(paste(numeric_vars, collapse = ", "), "\n")
+
+cat("Variables categóricas:\n")
+cat(paste(categorical_vars, collapse = ", "), "\n")
+
+
+```
+
+Se vio que todas las variables del dataset eran numéricas a excepción de dos variables categóricas: "SURGERY" y "GENDER". Para las variables categóricas, se realizó un análisis de frecuencias y se visualizaron mediante gráficos de barras.
+```{r}
+# Análisis de frecuencia para las variables categóricas
+table(DataValues_S013$SURGERY)
+table(DataValues_S013$GENDER)
+# Representación gráficas de las variables categóricas 
+# Frecuencia de la variable 'SURGERY'
+surgey_counts <- table(DataValues_S013$SURGERY)
+
+# Crear gráfico de barras para la variable 'SURGERY'
+barplot(surgey_counts, 
+        main = "Frecuencia de Cirugía", 
+        xlab = "Tipo de Cirugía", 
+        ylab = "Número de Individuos", 
+        col = c("lightblue", "lightgreen"), 
+        names.arg = c("By Pass", "Tubular"))
+
+# Frecuencia de la variable 'GENDER'
+gender_counts <- table(DataValues_S013$GENDER)
+
+# Crear gráfico de barras para la variable 'GENDER'
+barplot(gender_counts, 
+        main = "Frecuencia de Género", 
+        xlab = "Género", 
+        ylab = "Número de Individuos", 
+        col = c("lightpink", "lightblue"), 
+        names.arg = c("F", "M"))
+
+```
+En cuanto a las variables categóricas "Surgery" y "gender", se observó lo siguiente: la frecuencia de pacientes sometidos a cirugía de tipo "by pass" fue considerablemente mayor que la de aquellos que se sometieron a cirugía "tubular", con 26 pacientes en el primer grupo y solo 13 en el segundo. Además, en el grupo de pacientes analizado, se registró una mayor cantidad de mujeres en comparación con los hombres, con 27 mujeres frente a 12 hombres.
+
+Para las variables numéricas, se calcularon parámetros estadísticos como el mínimo, máximo, media, mediana y cuartiles. Además, se analizaron las distribuciones mediante histogramas y boxplots. 
+```{r}
+# Cargamos la librería ggplot
+library(ggplot2)
+# Filtramos las variables numéricas
+numeric_data <- DataValues_S013[sapply(DataValues_S013, is.numeric)]
+
+# Resumen estadístico (mínimo, máximo, media, mediana, cuartiles)
+summary_stats <- summary(numeric_data)
+head(summary_stats)
+
+
+# Visualización de la distribución de las variables numéricas con histogramas
+par(mfrow = c(2, 2))  # Crear una cuadrícula de 2x2 para los histogramas
+
+# Dibujar histogramas para cada columna numérica
+for (col in names(numeric_data)) {
+  hist(numeric_data[[col]], 
+       main = paste("Histograma de", col), 
+       xlab = col, 
+       col = "lightblue", 
+       border = "black")
+}
+
+# Creamos boxplots para detectar valores atípicos
+par(mfrow = c(2, 2))  # Cuadrícula 2x2 para los boxplots
+
+# Crear un boxplot para cada variable numérica
+for (col in names(numeric_data)) {
+  boxplot(numeric_data[[col]], 
+          main = paste("Boxplot de", col), 
+          ylab = col, 
+          col = "lightgreen", 
+          border = "black")
+}
+```
+
+Los histogramas permitieron observar la distribución de las mediciones y detectar distribuciones sesgadas, mientras que los boxplots ayudaron a identificar valores atípicos (outliers). 
+
+5. Selección del metabolito de interés y análisis univariado
+
+Tras visualizar los histogramas y boxplots de todas las variables numéricas del dataset, se eligió como metabolito la glucosa para continuar con el análisis exploratorio (análisis univariado y bivariado), puesto que la distribución de dicho metabolito era sesgada y aparecían outliers en su boxplot, lo que indicaba que podría tener un comportamiento particular o estar influenciada por factores externos que merecían un análisis más detallado. Esta elección se basó en la relevancia biológica de la glucosa en el contexto de la cirugía bariátrica, ya que se esperaba que la intervención quirúrgica tuviera un impacto significativo sobre sus niveles en sangre. A partir de esta selección, se procedió a realizar un análisis univariado de la glucosa, para evaluar su comportamiento a lo largo del tiempo y determinar si existían cambios significativos en sus niveles en los distintos momentos temporales del estudio.
+
+```{r}
+# Cargamos las librerías necesarias
+library(ggplot2)
+library(gridExtra)
+# Cargamos los datos de las mediciones (metabolitos)
+DataValues_S013 <- read.csv("DataValues_S013.csv", header = TRUE)
+
+# Eliminamos las filas con valores NA en las columnas de glucosa (GLU_T0, GLU_T2, GLU_T4, GLU_T5)
+DataValues_S013_clean <- na.omit(DataValues_S013[, c("GLU_T0", "GLU_T2", "GLU_T4", "GLU_T5")])
+
+# Resumen estadístico de la variable GLU en T0, T2, T4, T5 (sin NA)
+summary(DataValues_S013_clean$GLU_T0)
+summary(DataValues_S013_clean$GLU_T2)
+summary(DataValues_S013_clean$GLU_T4)
+summary(DataValues_S013_clean$GLU_T5)
+
+# Crear los histogramas para GLU a diferentes tiempos con ggplot2
+hist_T0 <- ggplot(DataValues_S013_clean, aes(x = GLU_T0)) +
+  geom_histogram(binwidth = 5, fill = "lightblue", color = "black", alpha = 0.7) +
+  labs(title = "Histograma GLU T0", x = "Glucosa en T0", y = "Frecuencia") +
+  theme_minimal()
+
+hist_T2 <- ggplot(DataValues_S013_clean, aes(x = GLU_T2)) +
+  geom_histogram(binwidth = 5, fill = "lightgreen", color = "black", alpha = 0.7) +
+  labs(title = "Histograma GLU T2", x = "Glucosa en T2", y = "Frecuencia") +
+  theme_minimal()
+
+hist_T4 <- ggplot(DataValues_S013_clean, aes(x = GLU_T4)) +
+  geom_histogram(binwidth = 5, fill = "lightyellow", color = "black", alpha = 0.7) +
+  labs(title = "Histograma GLU T4", x = "Glucosa en T4", y = "Frecuencia") +
+  theme_minimal()
+
+hist_T5 <- ggplot(DataValues_S013_clean, aes(x = GLU_T5)) +
+  geom_histogram(binwidth = 5, fill = "lightpink", color = "black", alpha = 0.7) +
+  labs(title = "Histograma GLU T5", x = "Glucosa en T5", y = "Frecuencia") +
+  theme_minimal()
+
+# Mostrar los 4 histogramas en una cuadrícula 2x2
+grid.arrange(hist_T0, hist_T2, hist_T4, hist_T5, ncol = 2)
+
+# Boxplot para GLU en diferentes tiempos
+par(mfrow = c(2, 2))  # Crear una cuadrícula de 2x2 para mostrar los gráficos
+
+# Boxplot para GLU_T0
+boxplot(DataValues_S013_clean$GLU_T0, main = "Boxplot GLU T0", ylab = "Glucosa en T0", col = "lightblue")
+
+# Boxplot para GLU_T2
+boxplot(DataValues_S013_clean$GLU_T2, main = "Boxplot GLU T2", ylab = "Glucosa en T2", col = "lightgreen")
+
+# Boxplot para GLU_T4
+boxplot(DataValues_S013_clean$GLU_T4, main = "Boxplot GLU T4", ylab = "Glucosa en T4", col = "lightyellow")
+
+# Boxplot para GLU_T5
+boxplot(DataValues_S013_clean$GLU_T5, main = "Boxplot GLU T5", ylab = "Glucosa en T5", col = "lightpink")
+
+
+```
+Tras el análisis estadístico de los niveles de glucosa en diferentes momentos (T0, T2, T4 y T5), se obtuvieron las siguientes conclusiones:
+
+GLU_T0 (nivel de glucosa antes de la cirugía) presentó una media de 108 y una mediana de 101. El rango fue amplio, con un valor mínimo de 71 y un valor máximo de 263, lo que sugirió la presencia de valores atípicos. La distribución mostró una ligera asimetría hacia la derecha debido a estos valores extremos.
+
+GLU_T2 (nivel de glucosa en T2) tuvo una media de 88.62 y una mediana de 87, con un rango de 66 a 117. Los valores estuvieron más concentrados en el rango intercuartílico (80-97), sin valores atípicos significativos, lo que indicó una distribución más equilibrada y estable.
+
+GLU_T4 (nivel de glucosa en T4) mostró una media de 81.9 y una mediana de 83, con un rango de 38 a 101. La distribución pareció estar sesgada hacia valores más bajos, especialmente con el valor mínimo de 38. Sin embargo, el rango intercuartílico fue estrecho (77-86), lo que sugirió que la mayoría de los datos estaban agrupados en torno a un rango medio.
+
+GLU_T5 (nivel de glucosa tras la cirugía) tuvo una media de 84.14 y una mediana de 84, con un rango de 67 a 101. Los datos estuvieron bien distribuidos alrededor de la media, con un rango intercuartílico de 74 a 94, lo que indicó una distribución equilibrada y sin valores atípicos importantes.
+
+En resumen, los niveles de glucosa mostraron una ligera disminución de T0 a T5, con una mayor variabilidad en T0 y valores extremos, mientras que los niveles de glucosa en T2, T4 y T5 estuvieron más concentrados y equilibrados. Este patrón sugirió que los niveles de glucosa se estabilizaron o mejoraron después de la cirugía bariátrica.
+
+Tras la observación de los histogramas y boxplot correspondientes a los niveles de glucosa en diferentes momentos (T0, T2, T4 y T5), se obtuvieron las siguientes conclusiones:
+- Antes de la cirugía (T0), los niveles de glucosa son más variables, con algunos pacientes mostrando niveles elevados que podrían ser indicativos de diabetes no controlada o descompensación metabólica, probablemente derivada de la condición patológica de obesidad mórbidad de dichos pacientes. 
+
+- Tras la cirugía (T2 y T5), los niveles de glucosa tienden a estabilizarse, mostrando una distribución más equilibrada sin valores extremos. Esto sugiere que la cirugía bariátrica podría estar teniendo un efecto positivo en el control de la glucosa, favoreciendo una mejora metabólica en los pacientes.
+
+6. Análisis bivariado del metabolito de interés
+Se realizó un análisis bivariado para comparar los niveles de glucosa entre los géneros y los tipos de cirugía. En este caso, comparamos los niveles de glucosa a tiempo 5 (tras la cirugía) según el sexo de los pacientes y según el tipo de cirugía a la que fueron sometidos.
+
+En primer lugar, se realizó la prueba de normalidad de Shapiro-Wilk para verificar si los niveles de glucosa en los diferentes grupos de sexo seguían una distribución normal.
+```{r}
+# Cargamos el paquete ggplot
+library(ggplot2)
+# Filtrar los datos de glucosa y género
+glucose_data <- DataValues_S013$GLU_T5
+gender_data <- DataValues_S013$GENDER  
+
+# Comprobar si los datos de glucosa siguen una distribución normal (opcional, pero recomendado)
+shapiro.test(glucose_data[gender_data == "F"])  # Normalidad para el grupo femenino
+shapiro.test(glucose_data[gender_data == "M"])  # Normalidad para el grupo masculino
+
+
+```
+
+Para el grupo femenino, el valor de W obtenido en el test de Shapiro-Wilk fue 0.95005, con un p-valor de 0.2716. Dado que el p-valor es mayor que 0.05, no se rechaza la hipótesis nula de normalidad. Esto sugiere que los niveles de glucosa en el grupo femenino siguen una distribución normal, indicando que los datos para este grupo son simétricos y no presentan una desviación significativa de la normalidad.
+
+Para el grupo masculino, el valor de W obtenido fue 0.7884, y el p-valor fue 0.02148. En este caso, el p-valor es menor que 0.05, lo que implica que se rechaza la hipótesis nula de normalidad. Esto indica que los niveles de glucosa en el grupo masculino no siguen una distribución normal, lo que sugiere que los datos pueden ser asimétricos, sesgados o presentar otras características que impiden que sigan una distribución normal.
+
+Se utilizaron diferentes pruebas según la normalidad de los datos. Para el grupo femenino, que muestra una distribución normal, se utilizó la prueba t de Student. Para el grupo masculino, no normal, se aplicó la prueba de Mann-Whitney.
+
+```{r}
+
+# Comparar los niveles de glucosa entre géneros usando un test t para los datos normales del grupo femenino
+resultado_test_t <- t.test(glucose_data[gender_data == "F"], glucose_data[gender_data == "M"], 
+                        alternative = "two.sided", var.equal = TRUE)  
+# Mostramos el resultado del test
+resultado_test_t
+
+# Comparar los niveles de glucosa entre géneros usando una prueba no paramétrica para el grupo masculino
+resultado_test_wilcoxon <- wilcox.test(glucose_data[gender_data == "F"], glucose_data[gender_data == "M"],
+                                  alternative = "two.sided")  # Prueba de Mann-Whitney
+# Mostramos el resultado
+resultado_test_wilcoxon
+
+# Gráfico de boxplot para visualizar la distribución de GLU_T5 por género
+ggplot(DataValues_S013, aes(x = GENDER, y = GLU_T5, fill = GENDER)) +
+  geom_boxplot() +
+  labs(title = "Comparación de los niveles de glucosa tras la cirugía según el Género",
+       x = "Género",
+       y = "Niveles de glucosa tras la cirugía") +
+  scale_fill_manual(values = c("lightblue", "lightpink")) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+- El valor p (0.8149) obtenido para las mujeres era considerablemente mayor que el umbral de significancia de 0.05, lo que indicaría que no se puede rechazar la hipótesis nula de que las medias de los niveles de glucosa entre hombres y mujeres son iguales. Además, el intervalo de confianza al 95% incluyó el valor 0, lo que refuerza la conclusión de que no existe una diferencia significativa en las medias de glucosa entre los géneros en la muestra analizada.
+
+- El valor p (0.7273) obtenido para los hombres era considerablemente mayor que 0.05, lo que sugiere que no hay una diferencia significativa entre los niveles de glucosa en hombres y mujeres. 
+
+Por tanto, aunque las medias de los dos grupos sean ligeramente diferentes (84.04 frente a 85.13), los resultados no proporcionan evidencia suficiente para concluir que esta diferencia sea estadísticamente significativa, ya que los valores p obtenidos (0.8149 y 0.7273, respectivamente) son mucho mayores que el umbral de significancia común de 0.05.
+
+Después, se realizó la prueba de normalidad de Shapiro-Wilk para verificar si los niveles de glucosa en los diferentes grupos de cirugía seguían una distribución normal. También se realizó la prueba de levene para evaluar si las varianzas entre grupos eran homogéneas
+```{r}
+# Cargar librerías necesarias
+library(ggplot2)
+
+
+# Filtrar los datos según la columna 'SURGERY'
+data_bypass <- DataValues_S013[DataValues_S013$SURGERY == "by pass", ]
+data_tubular <- DataValues_S013[DataValues_S013$SURGERY == "tubular", ]
+# Verificamos normalidad de los datos y homogeneidad de varianzas
+
+shapiro.test(data_bypass$GLU_T5)  # Para el grupo by pass
+shapiro.test(data_tubular$GLU_T5)  # Para el grupo tubular
+# Instalamos la librería necesaria
+library(car)
+# Realizamos la prueba de Levene
+leveneTest(GLU_T5 ~ SURGERY, data = DataValues_S013)
+
+```
+
+El valor p (0.0435) obtenido para el grupo de pacientes sometidos a cirugía "by pass" era mayor que el umbral común de significancia de 0.05. Esto significa que no se puede rechazar la hipótesis nula de que los datos siguen una distribución normal. El valor p (0.2871) obtenido para el grupo de pacientes sometidos a cirugía "tubular" también es mayor que 0.05, lo que indica que no se puede rechazar la hipótesis nula de normalidad. En consecuencia, se puede concluir que los niveles de glucosa tanto en el grupo de pacientes sometidos a cirugía "by pass" como en aquellos sometidos a cirugía "tubular" siguen una distribución normal, lo que permite usar métodos estadísticos paramétricos en análisis posteriores. Además, el valor p obtenido tras realizar la prueba de Levene fue de 0.582 (superior a 0.05), lo que indicaría que las varianzas de los niveles de glucosa tras la cirugía son homogéneas entre ambos grupos, por lo que se podría usar la prueba t de Student para comparar las medias de glucosa entre los dos grupos.
+```{r}
+# Cargar librerías necesarias
+library(ggplot2)
+
+# Filtrar los datos según la columna 'SURGERY'
+data_bypass <- DataValues_S013[DataValues_S013$SURGERY == "by pass", ]
+data_tubular <- DataValues_S013[DataValues_S013$SURGERY == "tubular", ]
+
+# Extraemos los valores de glucosa (GLU_T5) para cada tipo de cirugía
+glu_bypass <- data_bypass$GLU_T5
+glu_tubular <- data_tubular$GLU_T5
+
+# Realizar prueba t para comparar los niveles de glucosa en T5 entre los dos tipos de cirugía
+t_test_result <- t.test(glu_bypass, glu_tubular, alternative = "two.sided", var.equal = TRUE)
+
+# Mostrar el resultado de la prueba t
+t_test_result
+
+# Gráfico de boxplot para visualizar la distribución de GLU_T5 por tipo de cirugía
+ggplot(DataValues_S013, aes(x = SURGERY, y = GLU_T5, fill = SURGERY)) +
+  geom_boxplot() +
+  labs(title = "Comparación de los niveles de glucosa según el tipo de cirugía",
+       x = "Tipo de Cirugía",
+       y = "Niveles de glucosa tras la cirugía") +
+  scale_fill_manual(values = c("lightblue", "lightgreen")) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+El valor p obtenido en la prueba t de dos muestras fue de 0.6008, lo que es considerablemente mayor que el umbral común de significancia de 0.05. Esto significa que no se rechaza la hipótesis nula, lo que sugiere que no existe una diferencia significativa en las medias de los niveles de glucosa entre los dos grupos (By pass y Tubular). Por tanto, en base a los resultados obtenidos, podemos decir que no hay evidencia suficiente para afirmar que los niveles de glucosa tras la cirugía difieren significativamente entre los dos tipos de cirugía ("By pass" y "Tubular"). A pesar de que las medias de los dos grupos son ligeramente diferentes (83.71 vs. 86.13), el valor p obtenido (0.6008) es mucho mayor que el umbral de significancia (0.05), lo que indica que esta diferencia no es estadísticamente significativa.
+
+
+
